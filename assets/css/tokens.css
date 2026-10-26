@@ -1,0 +1,15 @@
+/* ===== DESIGN TOKENS ===== */
+:root {
+  --bg: #0d0d0f;
+  --bg-soft: #141418;
+  --card: #1a1a20;
+  --card-hover: #202028;
+  --line: #2a2a33;
+  --text: #f4f4f6;
+  --muted: #a0a0ab;
+  --accent: #ff5c39;
+  --accent-soft: rgba(255, 92, 57, 0.12);
+  --accent-glow: rgba(255, 92, 57, 0.35);
+  --radius: 20px;
+  --maxw: 1200px;
+}
