@@ -1,7 +1,12 @@
 /* ===== RESET & BASE ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  /* Компенсирует высоту sticky-шапки (72px) при якорной навигации,
+     чтобы заголовки секций не прятались под ней */
+  scroll-padding-top: 90px;
+}
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -80,4 +85,14 @@ h2.section-title {
   border-color: var(--accent);
   background: var(--accent-soft);
   transform: translateY(-3px);
+}
+
+/* ===== FOCUS VISIBLE (a11y) ===== */
+/* Видимый фокус с клавиатуры на тёмном фоне.
+   box-shadow цветом фона создаёт "тёмную подушку" между элементом и обводкой,
+   чтобы акцентный контур читался и на оранжевых кнопках (btn-primary). */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--bg);
 }

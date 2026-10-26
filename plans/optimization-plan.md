@@ -157,3 +157,100 @@ ttt/
   - `assets/js/main.js` — бургер-меню (IIFE, null-guard, Esc, клик вне, aria-состояния).
 - **`index.html`:** инлайн `<style>`/`<script>` удалены; подключены `assets/css/main.css` и `assets/js/main.js` (defer); добавлены `<main>`, `aria-labelledby` для секций, `aria-label`/`aria-controls` для навигации и бургера, `aria-hidden`/`focusable="false"` для декоративных SVG.
 - **Проверка:** страница открыта в браузере (file://), ошибок в консоли нет; скриншоты — `screenshots/hero.png`, `screenshots/branches.png`.
+
+---
+
+## 6. Аудит 2026-10-26 — текущее состояние после этапов 1–2
+
+### 6.1. Актуальная структура файлов
+
+```
+ttt/
+├── index.html                      ← 263 строки: разметка + подключения ресурсов
+├── assets/css/
+│   ├── tokens.css                  ← дизайн-токены :root — 16 строк
+│   ├── base.css                    ← reset, типографика, кнопки, контейнер — 84 строки
+│   ├── layout.css                  ← header/hero/branches/halls/rental/cta/footer — 413 строк
+│   ├── responsive.css              ← медиазапросы + prefers-reduced-motion — 43 строки
+│   └── main.css                    ← точка входа: @import ×4
+├── assets/js/main.js               ← бургер-меню (IIFE, Esc, клик вне) — 42 строки
+├── plans/optimization-plan.md      ← данный документ
+└── screenshots/                    ← hero.png, branches.png
+```
+
+### 6.2. Перечень технических проблем (по итогам аудита кода)
+
+**Решено этапами 1–2:** монолит разделён на слои; `<main>` + `aria-labelledby`; декоративные SVG/стрелки — `aria-hidden`; `defer` у скрипта; JS с null-guard, закрытие по Esc и клику вне; контраст `--muted` на `--bg` ≈ 7.5:1 — **проходит WCAG AA** (пункт C3 старого плана закрыт).
+
+**Открытые проблемы:**
+
+| # | Sev | Категория | Проблема |
+|---|:---:|---|---|
+| A1 | 🟥 | Архитектура | [`assets/css/main.css`](assets/css/main.css:5) подключает 4 файла через `@import` — последовательная render-blocking цепочка (5 сетевых round-trip до первого кадра). Нужны прямые `<link>` или сборка в один бандл. |
+| A2 | 🟨 | Инфраструктура | Нет package.json/build-процесса: нет минификации, автопрефиксера, кеш-бастинга (hash-версий ресурсов). |
+| B1 | 🟥 | Навигация | Нет `scroll-padding-top`: при переходе по якорям `#branches`/`#halls`/`#rental`/`#cta` заголовки секций прячутся под sticky-шапкой (72px). |
+| B2 | 🟨 | Семантика | Ссылки навигации без `<ul>/<li>` — скринридеры не озвучивают меню как список. |
+| B3 | 🟨 | Семантика | `href="#"` у логотипов в [index.html:15](index.html:15) и [index.html:255](index.html:255) — «мёртвые» ссылки. |
+| B4 | 🟨 | Семантика | `<em>` в hero-stats ([index.html:50](index.html:50)–59) — декоративные суффиксы (`12+`, `1–30`, `7/7`), семантически это эмфаза речи; заменить на `<span>`. |
+| B5 | 🟨 | Контакты | Заглушки: `+7 (812) 000-00-00`, `mailto:hello@hardwork.spb` (невалидный TLD `.spb`); нет `<address>` и `tel:` в футере. |
+| C1 | 🟥 | A11y | Нет skip-link «Перейти к контенту» — первая фокусируемая цель должна вести к `#main`. |
+| C2 | 🟨 | A11y | Нет стилей `:focus-visible` — клавиатурный фокус невидим на тёмном фоне. |
+| C4 | 🟨 | A11y/UX | `.branch-card .arrow` с hover-аффордансом «клик» (вращение, заливка), но карточки не являются ссылками — ложный интерактивный паттерн: сделать карточки ссылками на страницы филиалов либо убрать стрелку. |
+| D1 | 🟥 | SEO | Нет structured data JSON-LD (`LocalBusiness`/`DanceStudio` + филиалы с гео, часами, телефоном). |
+| D2 | 🟨 | SEO | Нет Open Graph / Twitter Card / favicon / `canonical`. |
+| E1 | 🟥 | Perf | `filter: blur(40–50px)` + крупные радиальные градиенты в `.hero::before/::after` ([layout.css:67](assets/css/layout.css:67)–85) и `.cta-box::before` — тяжёлый GPU-композитинг, фризы на слабых мобильных. |
+| E2 | 🟨 | Perf | Нет `content-visibility: auto` + `contain-intrinsic-size` для секций ниже первого экрана. |
+| F1 | 🟨 | Консистентность | Хардкод цветов в градиентах [layout.css:251](assets/css/layout.css:251)–253 и [layout.css:362](assets/css/layout.css:362) (#2a1a3e, #3e1f1a, #1a2a3e, #1c1218…) — не вынесен в токены. |
+| F2 | 🟢 | Качество | `overflow-x: hidden` на `<body>` маскирует переполнение — предпочтительнее `overflow-x: clip`. |
+
+### 6.3. Обновлённый архитектурный план
+
+**Этап 3 — Навигация и семантика (B1–B4, F2)**
+- `html { scroll-padding-top: 90px; }` в [`base.css`](assets/css/base.css:4) — якоря не будут прятаться под шапкой.
+- Обернуть ссылки навигации в `<ul>/<li>` ([index.html:16](index.html:16)).
+- Логотипы `href="#"` → `href="/"`.
+- `<em>` → `<span class="stat-mark">` (стилизация сохраняется).
+- `overflow-x: clip` вместо `hidden`.
+
+**Этап 4 — Доступность (C1, C2)**
+- Skip-link перед `<main>` + стили `.skip-link` (видим при фокусе).
+- Глобальный `:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }`.
+
+**Этап 5 — SEO и контакты (D1–D2, B5)**
+- JSON-LD: `DanceStudio`/`LocalBusiness` + `address`, `geo`, `openingHours`, `telephone` для 3 филиалов.
+- Open Graph + Twitter Card, `assets/img/favicon.svg`, `canonical`.
+- Заменить контактные заглушки реальными данными; добавить `<address>` в футер.
+
+**Этап 6 — Производительность (E1, E2, A1)**
+- Ограничить/убрать `blur()` на мобильных; уменьшить радиусы свечений.
+- `content-visibility: auto; contain-intrinsic-size: auto 700px;` для `.branches/.halls/.rental/.cta`.
+- Убрать `@import`: либо 4 параллельных `<link rel="stylesheet">`, либо единый бандл на этапе 8.
+
+**Этап 7 — Токены (F1)**
+- Вынести цвета градиентов в [`tokens.css`](assets/css/tokens.css): `--hall-sm`, `--hall-md`, `--hall-lg`, `--cta-bg`, `--cta-accent`.
+
+**Этап 8 — Инфраструктура (A2)**
+- `package.json` + минимальная сборка (lightningcss/esbuild) с минификацией и хешированием, либо Vite при развитии в многостраничник.
+
+**Этап 9 — Контроль качества**
+- W3C Validator, Lighthouse (Performance/A11y/SEO), axe-core, клавиатурный чек-лист, повторная проверка `prefers-reduced-motion`.
+
+### 6.4. Обновлённый чек-лист
+
+1. [x] Этапы 1–2: разделение на слои, `<main>`, aria-атрибуты, defer (2026-10-19).
+2. [-] Этап 3: scroll-padding-top ✅, nav-список, логотипы, `<em>`→`<span>`, `overflow-x: clip`.
+3. [-] Этап 4: skip-link, `:focus-visible` ✅.
+4. [ ] Этап 5: JSON-LD, OG/favicon/canonical, реальные контакты.
+5. [ ] Этап 6: убрать `@import`, ограничить blur, `content-visibility`.
+6. [ ] Этап 7: токены для градиентов.
+7. [ ] Этап 8: build и минификация.
+8. [ ] Этап 9: валидаторы и Lighthouse.
+
+---
+
+## 7. Журнал изменений (продолжение)
+
+### 2026-10-26 — Этап 3 (B1) и Этап 4 (C2), контент секции «Залы»
+- **scroll-padding-top:** в [`base.css`](assets/css/base.css:4) добавлен `scroll-padding-top: 90px` — якорная навигация больше не прячет заголовки под sticky-шапкой. Проверено в браузере.
+- **`:focus-visible`:** добавлен глобальный видимый фокус (акцентный контур 2px + тёмная «подушка» 4px) для интерактивных элементов на тёмном фоне ([`base.css`](assets/css/base.css:87)). Проверено Tab-навигацией в браузере.
+- **Фоновые изображения карточек залов:** в [`layout.css`](assets/css/layout.css:251) вместо плоских градиентов добавлены фоновые фото Unsplash для `.h-small/.h-medium/.h-large` с тёмным полупрозрачным градиентом поверх (`rgba(13,13,15,0.66→0.32)`), `background-size: cover` + `background-position: center`; сохранён `background-color` как fallback. Проверено в браузере.
